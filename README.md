@@ -2,6 +2,8 @@
 
 A local transcription app for handwritten documents, especially historical German scripts such as Suetterlin / Sütterlin.
 
+![Handwriting OCR screenshot](docs/handwriting-ocr-screenshot.png)
+
 You can run it in two ways:
 
 - Browser mode: starts a local server and opens the default browser
