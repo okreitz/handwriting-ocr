@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Handwriting OCR</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <p class="eyebrow">Local transcription workspace</p>
+          <h1>Handwriting OCR</h1>
+          <p class="topbar-subtitle">
+            Upload a page on the left and review the cleaned transcription on the right.
+          </p>
+        </div>
+        <button id="open-settings" class="secondary-button">Settings</button>
+      </header>
+
+      <main class="workspace">
+        <section class="panel input-panel">
+          <div class="section-heading">
+            <div class="panel-header">
+              <h2>Original Document</h2>
+              <span id="file-meta" class="muted">No file selected</span>
+            </div>
+            <p class="section-subtitle">Choose a PDF or image, preview it here, then start transcription.</p>
+          </div>
+
+          <div class="upload-toolbar">
+            <input id="file-input" type="file" accept=".pdf,image/*" />
+            <label for="file-input" class="secondary-button upload-button">Upload document</label>
+            <button id="transcribe-button" class="primary-button" disabled>
+              Transcribe
+            </button>
+          </div>
+
+          <div class="format-hint muted">
+            PDF, PNG, JPG or WEBP
+          </div>
+
+          <div class="preview-card">
+            <div class="preview-header">
+              <h3>Preview</h3>
+              <span id="preview-meta" class="muted">No preview available</span>
+            </div>
+            <div id="document-preview" class="document-preview empty">
+              <p id="preview-placeholder" class="preview-placeholder">
+                Upload a PDF or image to preview the original document here.
+              </p>
+              <img id="preview-image" class="preview-image" alt="Uploaded document preview" hidden />
+              <iframe
+                id="preview-frame"
+                class="preview-frame"
+                title="Uploaded PDF preview"
+                hidden
+              ></iframe>
+            </div>
+          </div>
+
+          <div class="preview-card">
+            <div class="preview-header">
+              <h3>Pipeline</h3>
+            </div>
+            <ol class="pipeline-list">
+              <li>OCR model reads the document</li>
+              <li>Correction model cleans the transcript</li>
+              <li>Result appears on the right</li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="panel output-panel">
+          <div class="section-heading">
+            <div class="panel-header">
+              <h2>Transcription</h2>
+              <span id="status-pill" class="status-pill idle">Idle</span>
+            </div>
+            <p class="section-subtitle">Corrected text is shown first, with the raw OCR directly below it.</p>
+          </div>
+
+          <div class="result-stack">
+            <article class="result-card">
+              <div class="result-card-header">
+                <h3>Corrected text</h3>
+                <div class="result-actions">
+                  <button id="save-text-button" class="secondary-button" type="button" disabled>
+                    Save corrected .txt
+                  </button>
+                  <button id="save-raw-button" class="secondary-button" type="button" disabled>
+                    Save raw OCR .txt
+                  </button>
+                </div>
+              </div>
+              <pre id="corrected-output" class="output-text">Your transcription will appear here.</pre>
+            </article>
+
+            <article class="result-card muted-card">
+              <div class="result-card-header">
+                <h3>Raw OCR</h3>
+              </div>
+              <pre id="raw-output" class="output-text">The raw OCR output will appear here.</pre>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form id="settings-form" class="settings-form" method="dialog">
+        <div class="settings-header">
+          <div>
+            <p class="eyebrow">Model configuration</p>
+            <h2>Settings</h2>
+          </div>
+          <button id="close-settings" class="icon-button" type="button">Close</button>
+        </div>
+
+        <section class="settings-grid">
+          <div class="settings-card">
+            <h3>OCR model</h3>
+            <label>
+              <span>Provider</span>
+              <select name="ocr-provider">
+                <option value="openrouter">OpenRouter</option>
+                <option value="azureDocumentIntelligence">Azure Document Intelligence</option>
+                <option value="googleDocumentAi">Google Document AI</option>
+              </select>
+            </label>
+            <label>
+              <span>Model</span>
+              <input name="ocr-model-search" type="search" placeholder="Search models" />
+              <select name="ocr-model"></select>
+            </label>
+          </div>
+
+          <div class="settings-card">
+            <h3>Correction model</h3>
+            <label>
+              <span>Provider</span>
+              <select name="correction-provider">
+                <option value="openrouter">OpenRouter</option>
+                <option value="azureDocumentIntelligence">Azure Document Intelligence</option>
+                <option value="googleDocumentAi">Google Document AI</option>
+              </select>
+            </label>
+            <label>
+              <span>Model</span>
+              <input name="correction-model-search" type="search" placeholder="Search models" />
+              <select name="correction-model"></select>
+            </label>
+          </div>
+
+          <div class="settings-card wide">
+            <h3>Providers</h3>
+            <div class="provider-block">
+              <div class="provider-title-row">
+                <h4>OpenRouter</h4>
+                <label class="toggle">
+                  <input name="openrouter-enabled" type="checkbox" />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <label>
+                <span>Base URL</span>
+                <input name="openrouter-base-url" type="text" placeholder="https://openrouter.ai/api/v1" />
+              </label>
+              <label>
+                <span>API key</span>
+                <input name="openrouter-api-key" type="password" placeholder="sk-or-..." />
+              </label>
+              <label>
+                <span>App name</span>
+                <input name="openrouter-app-name" type="text" placeholder="Handwriting OCR" />
+              </label>
+              <label>
+                <span>Referer</span>
+                <input name="openrouter-referer" type="text" placeholder="Optional" />
+              </label>
+              <div class="model-refresh-row">
+                <button id="refresh-models" class="secondary-button" type="button">Load models</button>
+                <span id="models-status" class="muted">Saved models are shown until refreshed.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <menu class="settings-actions">
+          <button class="secondary-button" id="cancel-settings" type="button">Cancel</button>
+          <button class="primary-button" type="submit">Save settings</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

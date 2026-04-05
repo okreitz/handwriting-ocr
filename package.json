@@ -1,0 +1,53 @@
+{
+  "name": "handwriting-ocr",
+  "version": "0.1.0",
+  "description": "Local browser app for transcribing handwritten documents with OCR and correction models.",
+  "type": "module",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "desktop": "electron .",
+    "desktop:dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "electron": "^35.1.4",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.okreitz.handwritingocr",
+    "productName": "Handwriting OCR",
+    "files": [
+      "desktop/**/*",
+      "server/**/*",
+      "public/**/*",
+      "package.json",
+      "README.md"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
