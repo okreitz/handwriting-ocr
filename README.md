@@ -59,22 +59,61 @@ npm start
 
 ## Install Desktop App
 
-To run the Electron desktop version during development:
+To run the desktop app directly on your own computer:
 
 ```bash
 npm run desktop
 ```
 
-To build installers:
+This opens the app in an Electron window instead of a web browser.
+
+## Make a Windows Installer on a Mac
+
+If you want to give the app to someone on Windows, follow these steps exactly:
+
+1. Open `Terminal` on your Mac.
+2. Go to the project folder.
+3. Install dependencies if you have not already done so:
 
 ```bash
-npm run dist
+npm install
 ```
 
-Build output:
+4. Build the Windows installer:
 
-- macOS: `.dmg` and `.zip`
-- Windows: `NSIS` installer and `.zip`
+```bash
+npm run dist -- --win
+```
+
+5. Wait until the build finishes. This can take a little while.
+6. Open the `dist` folder inside this project.
+7. Look for a Windows installer file ending in `.exe`.
+
+That `.exe` file is the Windows installer you can send to a Windows computer.
+
+If you want only the normal Windows installer, use:
+
+```bash
+npm run dist -- --win nsis
+```
+
+If you want a portable Windows app instead, use:
+
+```bash
+npm run dist -- --win portable
+```
+
+What you will usually find in the `dist` folder:
+
+- a Windows installer file ending in `.exe`
+- sometimes also a `.zip` file
+
+Important:
+
+- You can build the Windows installer on a Mac.
+- The Windows installer will not run on the Mac. It is only for Windows.
+- If the build stops with an error, run `npm install` again and try again.
+- The first build can be slower because Electron may need to download build files.
 
 ## Development
 
@@ -116,7 +155,7 @@ Typical outputs:
 Notes:
 
 - Build macOS artifacts on macOS
-- Build Windows artifacts on Windows unless you add a cross-build toolchain
+- Windows installers can also be built on macOS with `npm run dist -- --win`
 - App settings are stored in the local app data directory in desktop mode and in `data/settings.json` in browser mode
 
 ## Notes
@@ -127,7 +166,7 @@ Notes:
 
 ## Suggested Defaults
 
-- OCR model: a high-end vision-capable OpenRouter model such as `google/gemini-3.1-pro-preview
+- OCR model: a high-end vision-capable OpenRouter model such as `google/gemini-2.5-flash-preview`
 - Correction model: `openai/gpt-5-mini`
 
 Use whatever model IDs are currently available in your OpenRouter account.
