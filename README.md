@@ -125,7 +125,7 @@ Notes:
 
 ## Suggested Defaults
 
-- OCR model: a vision-capable OpenRouter model such as `google/gemini-2.5-flash-preview`
+- OCR model: a high-end vision-capable OpenRouter model such as `google/gemini-3.1-pro-preview
 - Correction model: `openai/gpt-5-mini`
 
 Use whatever model IDs are currently available in your OpenRouter account.
