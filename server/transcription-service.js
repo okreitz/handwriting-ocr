@@ -1,3 +1,5 @@
+import { splitDocumentIntoPages } from "./pdf-pages.js";
+
 const SUPPORTED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -8,6 +10,13 @@ const SUPPORTED_DOCUMENT_TYPES = new Set([
   "application/pdf",
   ...SUPPORTED_IMAGE_TYPES,
 ]);
+
+const DEFAULT_OCR_CONCURRENCY = 3;
+const PREVIOUS_PAGE_CONTEXT_LENGTH = 400;
+
+function toMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function requireProvider(settings, providerName) {
   const provider = settings.providers?.[providerName];
@@ -65,12 +74,8 @@ async function callOpenRouter({ provider, model, messages }) {
   throw new Error("OpenRouter returned an unexpected response shape.");
 }
 
-async function runOcrStep(filePayload, settings) {
+async function runOcrStep(page, settings, { pageCount }) {
   const ocrModel = requireModelConfig(settings.ocrModel, "OCR model");
-
-  if (!SUPPORTED_DOCUMENT_TYPES.has(filePayload.mimeType)) {
-    throw new Error("Unsupported file type. Use PDF, PNG, JPG, or WEBP.");
-  }
 
   if (ocrModel.provider !== "openrouter") {
     throw new Error(
@@ -79,15 +84,13 @@ async function runOcrStep(filePayload, settings) {
   }
 
   const provider = requireProvider(settings, "openrouter");
-  const dataUrl = `data:${filePayload.mimeType};base64,${filePayload.base64}`;
-  const attachmentType =
-    filePayload.mimeType === "application/pdf" ? "file" : "image_url";
+  const dataUrl = `data:${page.mimeType};base64,${page.base64}`;
   const attachmentPayload =
-    attachmentType === "file"
+    page.mimeType === "application/pdf"
       ? {
           type: "file",
           file: {
-            filename: filePayload.fileName || "document.pdf",
+            filename: page.fileName || "document.pdf",
             file_data: dataUrl,
           },
         }
@@ -97,6 +100,11 @@ async function runOcrStep(filePayload, settings) {
             url: dataUrl,
           },
         };
+
+  const pageLabel =
+    pageCount > 1
+      ? `This is page ${page.pageNumber} of a ${pageCount}-page document. Transcribe only this page, exactly.`
+      : "Transcribe this uploaded handwritten document exactly.";
 
   return callOpenRouter({
     provider,
@@ -111,7 +119,7 @@ async function runOcrStep(filePayload, settings) {
         content: [
           {
             type: "text",
-            text: "Transcribe this uploaded handwritten document exactly.",
+            text: pageLabel,
           },
           attachmentPayload,
         ],
@@ -120,7 +128,7 @@ async function runOcrStep(filePayload, settings) {
   });
 }
 
-async function runCorrectionStep(ocrText, settings) {
+async function runCorrectionStep(ocrText, settings, { previousPageTail } = {}) {
   const correctionModel = requireModelConfig(
     settings.correctionModel,
     "Correction model"
@@ -133,6 +141,9 @@ async function runCorrectionStep(ocrText, settings) {
   }
 
   const provider = requireProvider(settings, "openrouter");
+  const context = previousPageTail
+    ? `The previous page ended with the following text. Use it only to resolve words broken across the page break, and do not repeat it in your answer:\n"""\n${previousPageTail}\n"""\n\n`
+    : "";
 
   return callOpenRouter({
     provider,
@@ -144,26 +155,127 @@ async function runCorrectionStep(ocrText, settings) {
       },
       {
         role: "user",
-        content: `Correct this OCR transcription:\n\n${ocrText}`,
+        content: `${context}Correct this OCR transcription:\n\n${ocrText}`,
       },
     ],
   });
 }
 
-export async function transcribeDocument(filePayload, settings) {
+function resolveConcurrency(settings, pageTotal) {
+  const configured = Number(settings.pipeline?.ocrConcurrency);
+  const limit =
+    Number.isFinite(configured) && configured >= 1
+      ? Math.floor(configured)
+      : DEFAULT_OCR_CONCURRENCY;
+  return Math.max(1, Math.min(limit, pageTotal));
+}
+
+// Runs `worker` over `items` with a bounded number in flight, and returns one
+// promise per item in original order so the caller can consume them in sequence.
+function startWithConcurrency(items, limit, worker) {
+  const deferreds = items.map(() => {
+    let resolve;
+    const promise = new Promise((resolveFn) => {
+      resolve = resolveFn;
+    });
+    return { promise, resolve };
+  });
+
+  let nextIndex = 0;
+  const runNext = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      deferreds[index].resolve(await worker(items[index]));
+    }
+  };
+
+  for (let slot = 0; slot < limit; slot += 1) {
+    runNext();
+  }
+
+  return deferreds.map((deferred) => deferred.promise);
+}
+
+export async function* transcribeDocumentPages(filePayload, settings, options = {}) {
   if (!filePayload?.base64 || !filePayload?.mimeType) {
     throw new Error("Missing uploaded document payload.");
   }
 
-  const startedAt = new Date().toISOString();
-  const rawTranscription = await runOcrStep(filePayload, settings);
-  const correctedTranscription = await runCorrectionStep(rawTranscription, settings);
+  if (!SUPPORTED_DOCUMENT_TYPES.has(filePayload.mimeType)) {
+    throw new Error("Unsupported file type. Use PDF, PNG, JPG, or WEBP.");
+  }
 
-  return {
+  const startedAt = new Date().toISOString();
+  const { pageCount, pages } = await splitDocumentIntoPages(filePayload, {
+    pageRange: options.pageRange,
+  });
+
+  yield {
+    type: "start",
+    startedAt,
+    fileName: filePayload.fileName || "document",
+    pageCount,
+    pageNumbers: pages.map((page) => page.pageNumber),
+  };
+
+  // OCR runs several pages at a time, correction stays sequential so each page
+  // can see where the previous one left off.
+  const ocrResults = startWithConcurrency(
+    pages,
+    resolveConcurrency(settings, pages.length),
+    async (page) => {
+      try {
+        return { text: await runOcrStep(page, settings, { pageCount }) };
+      } catch (error) {
+        return { error: toMessage(error) };
+      }
+    }
+  );
+
+  let previousPageTail = "";
+  let failedPages = 0;
+
+  for (const [index, page] of pages.entries()) {
+    const ocr = await ocrResults[index];
+    let correctedTranscription = "";
+    let error = ocr.error || null;
+
+    if (!error) {
+      try {
+        correctedTranscription = await runCorrectionStep(ocr.text, settings, {
+          previousPageTail,
+        });
+        previousPageTail = correctedTranscription.slice(
+          -PREVIOUS_PAGE_CONTEXT_LENGTH
+        );
+      } catch (correctionError) {
+        error = toMessage(correctionError);
+      }
+    }
+
+    if (error) {
+      failedPages += 1;
+    }
+
+    yield {
+      type: "page",
+      page: {
+        pageNumber: page.pageNumber,
+        rawTranscription: ocr.text || "",
+        correctedTranscription,
+        error,
+      },
+    };
+  }
+
+  yield {
+    type: "done",
     startedAt,
     completedAt: new Date().toISOString(),
     fileName: filePayload.fileName || "document",
-    rawTranscription,
-    correctedTranscription,
+    pageCount,
+    transcribedPages: pages.length,
+    failedPages,
   };
 }

@@ -2,6 +2,11 @@ const state = {
   file: null,
   settings: null,
   isRunning: false,
+  pages: [],
+  pageCount: 0,
+  pageNumbers: [],
+  activePageNumber: null,
+  previewUrl: null,
 };
 
 const fileInput = document.querySelector("#file-input");
@@ -12,6 +17,14 @@ const rawOutput = document.querySelector("#raw-output");
 const statusPill = document.querySelector("#status-pill");
 const saveTextButton = document.querySelector("#save-text-button");
 const saveRawButton = document.querySelector("#save-raw-button");
+const savePageButton = document.querySelector("#save-page-button");
+const pageRangeInput = document.querySelector("#page-range-input");
+const pageNav = document.querySelector("#page-nav");
+const pageSelect = document.querySelector("#page-select");
+const prevPageButton = document.querySelector("#prev-page");
+const nextPageButton = document.querySelector("#next-page");
+const pageProgress = document.querySelector("#page-progress");
+const pageError = document.querySelector("#page-error");
 const documentPreview = document.querySelector("#document-preview");
 const previewMeta = document.querySelector("#preview-meta");
 const previewPlaceholder = document.querySelector("#preview-placeholder");
@@ -97,7 +110,7 @@ function updatePreview() {
   previewMeta.textContent = state.file.type === "application/pdf" ? "PDF preview" : "Image preview";
 
   if (state.file.type === "application/pdf") {
-    previewFrame.src = state.previewUrl;
+    previewFrame.src = `${state.previewUrl}#page=1`;
     previewFrame.hidden = false;
     previewPlaceholder.hidden = true;
     documentPreview.classList.remove("empty");
@@ -115,32 +128,139 @@ function updatePreview() {
   previewMeta.textContent = "Preview unavailable for this file type";
 }
 
-function updateFileUI() {
-  const hasCorrectedText =
-    correctedOutput.textContent &&
-    correctedOutput.textContent !== "Your transcription will appear here." &&
-    correctedOutput.textContent !== "Running correction pipeline...";
-  const hasRawText =
-    rawOutput.textContent &&
-    rawOutput.textContent !== "The raw OCR output will appear here." &&
-    rawOutput.textContent !== "Running OCR..." &&
-    rawOutput.textContent !== "No OCR output available.";
-
-  if (!state.file) {
-    fileMeta.textContent = "No file selected";
-    transcribeButton.disabled = true;
-    updatePreview();
-    saveTextButton.disabled = !hasCorrectedText;
-    saveRawButton.disabled = !hasRawText;
+// Keeps the original document on the same page the transcription panel shows.
+function syncPreviewPage(pageNumber) {
+  if (!state.previewUrl || state.file?.type !== "application/pdf" || !pageNumber) {
     return;
   }
 
-  const sizeKb = Math.round(state.file.size / 1024);
-  fileMeta.textContent = `${state.file.name} • ${sizeKb} KB`;
-  transcribeButton.disabled = state.isRunning;
-  saveTextButton.disabled = !hasCorrectedText;
-  saveRawButton.disabled = !hasRawText;
-  updatePreview();
+  previewFrame.src = `${state.previewUrl}#page=${pageNumber}`;
+  previewMeta.textContent =
+    state.pageCount > 1
+      ? `PDF preview • page ${pageNumber} of ${state.pageCount}`
+      : "PDF preview";
+}
+
+function findPage(pageNumber) {
+  return state.pages.find((page) => page.pageNumber === pageNumber) || null;
+}
+
+function resetPages() {
+  state.pages = [];
+  state.pageCount = 0;
+  state.pageNumbers = [];
+  state.activePageNumber = null;
+  pageNav.hidden = true;
+  pageSelect.innerHTML = "";
+  pageProgress.textContent = "";
+  pageError.hidden = true;
+  pageError.textContent = "";
+  updateSaveButtons();
+}
+
+function updateSaveButtons() {
+  const hasPages = state.pages.length > 0;
+  saveTextButton.disabled = !hasPages;
+  saveRawButton.disabled = !hasPages;
+  savePageButton.disabled = !findPage(state.activePageNumber);
+}
+
+function renderPageNav() {
+  const total = state.pageNumbers.length;
+  pageNav.hidden = total <= 1;
+
+  if (total === 0) {
+    pageSelect.innerHTML = "";
+    pageProgress.textContent = "";
+    return;
+  }
+
+  pageSelect.innerHTML = "";
+  for (const pageNumber of state.pageNumbers) {
+    const page = findPage(pageNumber);
+    const label = !page
+      ? `Page ${pageNumber} — pending`
+      : page.error
+        ? `Page ${pageNumber} — failed`
+        : `Page ${pageNumber}`;
+    const option = createOption(String(pageNumber), label);
+    option.disabled = !page;
+    pageSelect.append(option);
+  }
+
+  if (state.activePageNumber !== null) {
+    pageSelect.value = String(state.activePageNumber);
+  }
+
+  pageProgress.textContent = `${state.pages.length} of ${total} pages transcribed`;
+
+  const index = state.pageNumbers.indexOf(state.activePageNumber);
+  prevPageButton.disabled = index <= 0;
+  nextPageButton.disabled =
+    index < 0 || index >= total - 1 || !findPage(state.pageNumbers[index + 1]);
+}
+
+function renderActivePage() {
+  const page = findPage(state.activePageNumber);
+
+  if (!page) {
+    pageError.hidden = true;
+    pageError.textContent = "";
+    return;
+  }
+
+  if (page.error) {
+    pageError.hidden = false;
+    pageError.textContent = `Page ${page.pageNumber} failed: ${page.error}`;
+  } else {
+    pageError.hidden = true;
+    pageError.textContent = "";
+  }
+
+  correctedOutput.textContent =
+    page.correctedTranscription ||
+    (page.error ? "No corrected text for this page." : "This page came back empty.");
+  rawOutput.textContent =
+    page.rawTranscription ||
+    (page.error ? "No OCR output for this page." : "This page came back empty.");
+}
+
+function setActivePage(pageNumber) {
+  if (!findPage(pageNumber)) {
+    return;
+  }
+
+  state.activePageNumber = pageNumber;
+  renderActivePage();
+  renderPageNav();
+  updateSaveButtons();
+  syncPreviewPage(pageNumber);
+}
+
+function stepPage(offset) {
+  const index = state.pageNumbers.indexOf(state.activePageNumber);
+  if (index < 0) {
+    return;
+  }
+
+  setActivePage(state.pageNumbers[index + offset]);
+}
+
+function updateFileUI({ refreshPreview = true } = {}) {
+  if (!state.file) {
+    fileMeta.textContent = "No file selected";
+    transcribeButton.disabled = true;
+  } else {
+    const sizeKb = Math.round(state.file.size / 1024);
+    fileMeta.textContent = `${state.file.name} • ${sizeKb} KB`;
+    transcribeButton.disabled = state.isRunning;
+  }
+
+  updateSaveButtons();
+
+  if (refreshPreview) {
+    updatePreview();
+  }
 }
 
 function buildTextFileName(suffix = "transcription") {
@@ -149,12 +269,46 @@ function buildTextFileName(suffix = "transcription") {
   return `${baseName}-${suffix}.txt`;
 }
 
+function pageBodyText(page, key) {
+  if (page.error) {
+    return `[Transcription failed: ${page.error}]`;
+  }
+
+  return (page[key] || "").trim();
+}
+
+function buildDocumentText(key) {
+  if (state.pages.length === 0) {
+    return "";
+  }
+
+  if (state.pageCount <= 1) {
+    return pageBodyText(state.pages[0], key);
+  }
+
+  return state.pages
+    .map((page) => `--- Page ${page.pageNumber} ---\n\n${pageBodyText(page, key)}`)
+    .join("\n\n");
+}
+
 function saveCorrectedText() {
-  saveTextBlob(correctedOutput.textContent?.trim(), buildTextFileName());
+  saveTextBlob(buildDocumentText("correctedTranscription"), buildTextFileName());
 }
 
 function saveRawText() {
-  saveTextBlob(rawOutput.textContent?.trim(), buildTextFileName("raw-ocr"));
+  saveTextBlob(buildDocumentText("rawTranscription"), buildTextFileName("raw-ocr"));
+}
+
+function saveCurrentPageText() {
+  const page = findPage(state.activePageNumber);
+  if (!page) {
+    return;
+  }
+
+  saveTextBlob(
+    pageBodyText(page, "correctedTranscription"),
+    buildTextFileName(`page-${page.pageNumber}`)
+  );
 }
 
 function saveTextBlob(text, fileName) {
@@ -379,6 +533,78 @@ async function fileToBase64(file) {
   return btoa(binary);
 }
 
+// The server streams one JSON object per line so pages can be shown as they land.
+async function* readNdjsonStream(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex = buffer.indexOf("\n");
+      while (newlineIndex >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line) {
+          yield JSON.parse(line);
+        }
+        newlineIndex = buffer.indexOf("\n");
+      }
+    }
+
+    const tail = buffer.trim();
+    if (tail) {
+      yield JSON.parse(tail);
+    }
+  } finally {
+    // Leaving the loop early (an error event) would otherwise keep the response open.
+    await reader.cancel().catch(() => {});
+  }
+}
+
+function describeProgress() {
+  const total = state.pageNumbers.length;
+  return total > 1 ? `Running ${state.pages.length}/${total}` : "Running";
+}
+
+function handleTranscriptionEvent(event) {
+  if (event.type === "start") {
+    state.pageCount = event.pageCount;
+    state.pageNumbers = event.pageNumbers || [];
+    renderPageNav();
+    setStatus("running", describeProgress());
+    return;
+  }
+
+  if (event.type === "page") {
+    state.pages.push(event.page);
+
+    // Land on the first finished page, but never yank the reader off the page
+    // they are currently on as later ones arrive.
+    if (state.activePageNumber === null) {
+      setActivePage(event.page.pageNumber);
+    } else if (state.activePageNumber === event.page.pageNumber) {
+      renderActivePage();
+    }
+
+    renderPageNav();
+    updateSaveButtons();
+    setStatus("running", describeProgress());
+    return;
+  }
+
+  if (event.type === "error") {
+    throw new Error(event.details || event.error || "Transcription failed.");
+  }
+}
+
 async function runTranscription() {
   if (!state.file || state.isRunning) {
     return;
@@ -386,45 +612,87 @@ async function runTranscription() {
 
   state.isRunning = true;
   transcribeButton.disabled = true;
+  resetPages();
   correctedOutput.textContent = "Running correction pipeline...";
   rawOutput.textContent = "Running OCR...";
   setStatus("running", "Running");
 
   try {
     const base64 = await fileToBase64(state.file);
-    const payload = await fetchJson("/api/transcribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        fileName: state.file.name,
-        mimeType: state.file.type || "application/octet-stream",
-        base64,
-      }),
-    });
+    let response;
 
-    rawOutput.textContent = payload.rawTranscription || "";
-    correctedOutput.textContent = payload.correctedTranscription || "";
-    setStatus("done", "Done");
-    saveTextButton.disabled = false;
-    saveRawButton.disabled = false;
+    try {
+      response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: state.file.name,
+          mimeType: state.file.type || "application/octet-stream",
+          base64,
+          pageRange: pageRangeInput.value.trim(),
+        }),
+      });
+    } catch (error) {
+      throw new Error(buildLocalServerError());
+    }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(
+        payload?.details ||
+          payload?.error ||
+          `Request failed with status ${response.status}.`
+      );
+    }
+
+    for await (const event of readNdjsonStream(response)) {
+      handleTranscriptionEvent(event);
+    }
+
+    if (state.pages.length === 0) {
+      throw new Error("The transcription finished without returning any pages.");
+    }
+
+    const failedPages = state.pages.filter((page) => page.error).length;
+    if (failedPages === state.pages.length) {
+      setStatus("error", "Error");
+    } else if (failedPages > 0) {
+      setStatus("done", `Done • ${failedPages} failed`);
+    } else {
+      setStatus("done", "Done");
+    }
   } catch (error) {
-    correctedOutput.textContent = error.message;
-    rawOutput.textContent = "No OCR output available.";
+    // Pages that already arrived stay readable; the error explains the rest.
+    if (state.pages.length === 0) {
+      correctedOutput.textContent = error.message;
+      rawOutput.textContent = "No OCR output available.";
+    } else {
+      pageError.hidden = false;
+      pageError.textContent = error.message;
+    }
     setStatus("error", "Error");
-    saveTextButton.disabled = true;
-    saveRawButton.disabled = true;
   } finally {
     state.isRunning = false;
-    updateFileUI();
+    updateFileUI({ refreshPreview: false });
   }
 }
 
 fileInput.addEventListener("change", (event) => {
   state.file = event.target.files?.[0] || null;
+  resetPages();
+  correctedOutput.textContent = "Your transcription will appear here.";
+  rawOutput.textContent = "The raw OCR output will appear here.";
+  setStatus("idle", "Idle");
   updateFileUI();
 });
+
+pageSelect.addEventListener("change", (event) => {
+  setActivePage(Number(event.target.value));
+});
+prevPageButton.addEventListener("click", () => stepPage(-1));
+nextPageButton.addEventListener("click", () => stepPage(1));
 
 window.addEventListener("beforeunload", clearPreview);
 
@@ -446,6 +714,7 @@ refreshModelsButton.addEventListener("click", async () => {
 });
 saveTextButton.addEventListener("click", saveCorrectedText);
 saveRawButton.addEventListener("click", saveRawText);
+savePageButton.addEventListener("click", saveCurrentPageText);
 settingsForm.addEventListener("submit", async (event) => {
   try {
     await saveSettings(event);

@@ -37,6 +37,9 @@ const DEFAULT_SETTINGS = {
       apiKey: "",
     },
   },
+  pipeline: {
+    ocrConcurrency: 3,
+  },
   prompts: {
     ocr:
       "Transcribe this handwritten document faithfully. The handwriting may be German Suetterlin / Sütterlin. Preserve line breaks where possible, mark uncertain readings in [brackets], and do not summarize.",

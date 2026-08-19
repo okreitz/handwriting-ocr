@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { listModels, mergeSettings } from "./models-service.js";
 import { loadSettings, saveSettings } from "./settings-store.js";
-import { transcribeDocument } from "./transcription-service.js";
+import { transcribeDocumentPages } from "./transcription-service.js";
 
 const HOST = "127.0.0.1";
 const PUBLIC_DIR = fileURLToPath(new URL("../public", import.meta.url));
@@ -135,20 +135,65 @@ async function handleApi(request, response) {
   }
 
   if (url.pathname === "/api/transcribe" && request.method === "POST") {
-    try {
-      const payload = await readRequestBody(request);
-      const result = await transcribeDocument(payload, loadSettings());
-      sendJson(response, 200, result);
-    } catch (error) {
-      sendJson(response, 400, {
-        error: "Transcription failed.",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
+    await handleTranscribe(request, response);
     return true;
   }
 
   return false;
+}
+
+// Streams newline-delimited JSON so each page reaches the UI as it finishes,
+// instead of making the browser wait for a whole multi-page document.
+async function handleTranscribe(request, response) {
+  let payload;
+
+  try {
+    payload = await readRequestBody(request);
+  } catch (error) {
+    sendJson(response, 400, {
+      error: "Transcription failed.",
+      details: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  const { pageRange, ...filePayload } = payload || {};
+  let headersSent = false;
+
+  const writeEvent = (event) => {
+    if (!headersSent) {
+      response.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+        "X-Accel-Buffering": "no",
+      });
+      headersSent = true;
+    }
+    response.write(`${JSON.stringify(event)}\n`);
+  };
+
+  try {
+    const settings = loadSettings();
+    for await (const event of transcribeDocumentPages(filePayload, settings, {
+      pageRange,
+    })) {
+      writeEvent(event);
+    }
+    response.end();
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+
+    // Once streaming has started the status code is already committed, so the
+    // failure has to travel as a final event instead.
+    if (headersSent) {
+      writeEvent({ type: "error", error: "Transcription failed.", details });
+      response.end();
+      return;
+    }
+
+    sendJson(response, 400, { error: "Transcription failed.", details });
+  }
 }
 
 function openBrowser(url) {

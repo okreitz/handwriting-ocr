@@ -9,7 +9,8 @@ You can run it in two ways:
 - Browser mode: starts a local server and opens the default browser
 - Desktop mode: runs as a packaged Electron app on macOS or Windows
 
-The transcription flow is a two-step pipeline:
+Multi-page PDFs are split into single pages and transcribed page by page. The
+transcription flow per page is a two-step pipeline:
 
 1. OCR / handwriting transcription model
 2. Correction model
@@ -21,8 +22,12 @@ The first implementation starts with OpenRouter for model access and stores sett
 - Local server that opens the default browser automatically
 - Electron desktop app for macOS and Windows
 - Split-pane UI for upload and transcription
+- Multi-page PDF support with page-by-page transcription
+- Page navigation on the output side, kept in sync with the document preview
+- Pages appear as soon as they are transcribed, instead of after the whole document
+- Optional page range so you can transcribe only part of a long document
 - Original document preview for images and PDFs
-- Save corrected transcription and raw OCR as `.txt`
+- Save corrected transcription and raw OCR as `.txt`, per page or whole document
 - Settings for OCR model, correction model, and provider API keys
 - OpenRouter-backed OCR and correction pipeline
 - Local JSON settings persistence
@@ -55,7 +60,32 @@ npm start
    - one vision-capable OCR model
    - one correction model
 
-8. Upload a handwritten page and click `Transcribe`.
+8. Upload a handwritten page or a multi-page PDF and click `Transcribe`.
+
+## Multi-Page PDFs
+
+A PDF with several pages is split locally into single pages before anything is
+sent to a model. Each page then runs through OCR and correction on its own, and
+the result appears in the right-hand panel as soon as that page is finished.
+
+- Use the page selector above the transcription to move between pages. The
+  document preview follows along, so both sides always show the same page.
+- Each page costs two model calls, so a 40-page PDF means 80 calls. Use the
+  `Pages` field next to `Transcribe` to limit a run: leave it empty for the whole
+  document, or enter `1-4`, `2,5`, or `10-` to start at page 10 and continue to
+  the end.
+- If one page fails, for example because the provider rate-limits the request,
+  the remaining pages still finish. The failed page is marked in the page
+  selector and the reason is shown above the transcription.
+- `Save corrected .txt` and `Save raw OCR .txt` write the whole document with
+  `--- Page N ---` separators. `Save this page .txt` writes only the page you are
+  looking at.
+- The correction step sees the end of the previous corrected page, so sentences
+  running across a page break are cleaned up as one sentence.
+
+Pages are read three at a time by default. To change that, edit `pipeline.ocrConcurrency`
+in the settings file (`data/settings.json` in browser mode, or the app data
+directory in desktop mode). Lower it to `1` if your provider rate-limits you.
 
 ## Install Desktop App
 
@@ -160,7 +190,9 @@ Notes:
 
 ## Notes
 
-- This version sends the uploaded file directly to a vision-capable model through OpenRouter when the OCR step uses the `openrouter` provider.
+- This version sends each page directly to a vision-capable model through OpenRouter when the OCR step uses the `openrouter` provider.
+- PDF splitting happens on your machine with `pdf-lib`; only single pages leave the app.
+- `/api/transcribe` responds with newline-delimited JSON (`start`, one `page` per finished page, then `done`), which is what lets the UI show pages while the run is still going.
 - The correction step is a second LLM call that cleans up the OCR output with a focus on historical German handwriting such as Suetterlin / Sütterlin.
 - Azure Document Intelligence and Google Document AI are included as future provider targets in the settings schema, but they are not implemented in this first pass.
 

@@ -32,13 +32,19 @@
           <div class="upload-toolbar">
             <input id="file-input" type="file" accept=".pdf,image/*" />
             <label for="file-input" class="secondary-button upload-button">Upload document</label>
+            <label class="page-range-field">
+              <span class="muted">Pages</span>
+              <input id="page-range-input" type="text" placeholder="all" size="7" />
+            </label>
             <button id="transcribe-button" class="primary-button" disabled>
               Transcribe
             </button>
           </div>
 
           <div class="format-hint muted">
-            PDF, PNG, JPG or WEBP
+            PDF, PNG, JPG or WEBP &middot; multi-page PDFs are transcribed page by page.
+            Leave <em>Pages</em> empty for the whole document, or enter a range like
+            <code>1-4</code>, <code>2,5</code> or <code>10-</code>.
           </div>
 
           <div class="preview-card">
@@ -65,9 +71,10 @@
               <h3>Pipeline</h3>
             </div>
             <ol class="pipeline-list">
-              <li>OCR model reads the document</li>
-              <li>Correction model cleans the transcript</li>
-              <li>Result appears on the right</li>
+              <li>PDF is split into single pages</li>
+              <li>OCR model reads each page</li>
+              <li>Correction model cleans each page</li>
+              <li>Pages appear on the right as they finish</li>
             </ol>
           </div>
         </section>
@@ -80,6 +87,23 @@
             </div>
             <p class="section-subtitle">Corrected text is shown first, with the raw OCR directly below it.</p>
           </div>
+
+          <nav id="page-nav" class="page-nav" aria-label="Transcribed pages" hidden>
+            <button id="prev-page" class="secondary-button page-step" type="button" aria-label="Previous page">
+              &lsaquo;
+            </button>
+            <label class="page-select-field">
+              <span class="visually-hidden">Page</span>
+              <select id="page-select"></select>
+            </label>
+            <button id="next-page" class="secondary-button page-step" type="button" aria-label="Next page">
+              &rsaquo;
+            </button>
+            <span id="page-progress" class="muted page-progress"></span>
+            <button id="save-page-button" class="secondary-button page-save" type="button" disabled>
+              Save this page .txt
+            </button>
+          </nav>
 
           <div class="result-stack">
             <article class="result-card">
@@ -94,6 +118,7 @@
                   </button>
                 </div>
               </div>
+              <p id="page-error" class="page-error" hidden></p>
               <pre id="corrected-output" class="output-text">Your transcription will appear here.</pre>
             </article>
 
