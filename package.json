@@ -1,19 +1,18 @@
 {
   "name": "handwriting-ocr",
-  "version": "0.1.0",
-  "description": "Local browser app for transcribing handwritten documents with OCR and correction models.",
+  "version": "0.2.0",
+  "description": "Desktop app for transcribing historical handwriting with vision models.",
   "type": "module",
   "main": "desktop/main.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node server/index.js",
     "desktop": "electron .",
-    "desktop:dev": "electron .",
+    "test": "node --test",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder --publish never"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "electron": "^35.1.4",
@@ -22,32 +21,46 @@
   "build": {
     "appId": "com.okreitz.handwritingocr",
     "productName": "Handwriting OCR",
+    "artifactName": "Handwriting-OCR-${version}-${os}-${arch}.${ext}",
     "files": [
       "desktop/**/*",
       "server/**/*",
       "public/**/*",
-      "package.json",
-      "README.md"
+      "package.json"
     ],
     "directories": {
       "buildResources": "build"
     },
+    "publish": null,
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ]
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "artifactName": "Handwriting-OCR-Setup-${version}.${ext}"
     }
   },
   "dependencies": {

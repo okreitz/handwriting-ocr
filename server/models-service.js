@@ -1,21 +1,13 @@
-function requireOpenRouterProvider(settings) {
-  const provider = settings.providers?.openrouter;
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
-  if (!provider?.enabled) {
-    throw new Error('Provider "openrouter" is not enabled in settings.');
-  }
+import { buildHeaders, describeErrorBody } from "./openrouter.js";
+import { getDataDir } from "./settings-store.js";
 
-  if (!provider.apiKey) {
-    throw new Error("OpenRouter API key is missing. Add it in Settings first.");
-  }
-
-  return provider;
-}
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function formatModelEntry(model) {
   const inputModalities = model?.architecture?.input_modalities || [];
-  const supportsImage = inputModalities.includes("image");
-  const supportsFile = inputModalities.includes("file");
 
   return {
     id: model.id,
@@ -23,59 +15,61 @@ function formatModelEntry(model) {
     description: model.description || "",
     contextLength: model.context_length || 0,
     inputModalities,
-    supportedParameters: model.supported_parameters || [],
-    supportsVision: supportsImage || supportsFile,
+    supportsVision:
+      inputModalities.includes("image") || inputModalities.includes("file"),
   };
 }
 
-export async function listModels({ providerName }, settings) {
-  if (providerName !== "openrouter") {
-    throw new Error(
-      `Model listing for provider "${providerName}" is not implemented yet.`
-    );
+function cachePath() {
+  return join(getDataDir(), "models-cache.json");
+}
+
+async function readCachedModels(baseUrl) {
+  try {
+    const cached = JSON.parse(await readFile(cachePath(), "utf8"));
+    const age = Date.now() - Date.parse(cached.fetchedAt);
+    if (cached.baseUrl === baseUrl && age >= 0 && age < CACHE_TTL_MS) {
+      return cached;
+    }
+  } catch {
+    // No usable cache.
+  }
+  return null;
+}
+
+// The model list has hundreds of entries and rarely changes, so it is kept for
+// a day. `force` skips the cache (the "Load models" button).
+export async function listModels(settings, { force = false } = {}) {
+  const provider = settings.providers.openrouter;
+
+  if (!force) {
+    const cached = await readCachedModels(provider.baseUrl);
+    if (cached) {
+      return { fetchedAt: cached.fetchedAt, models: cached.models, cached: true };
+    }
   }
 
-  const provider = requireOpenRouterProvider(settings);
   const response = await fetch(`${provider.baseUrl}/models`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${provider.apiKey}`,
-      "Content-Type": "application/json",
-      ...(provider.referer ? { "HTTP-Referer": provider.referer } : {}),
-      ...(provider.appName ? { "X-Title": provider.appName } : {}),
-    },
+    headers: buildHeaders(provider),
+    signal: AbortSignal.timeout(30_000),
   });
-
-  const data = await response.json();
+  const bodyText = await response.text();
 
   if (!response.ok) {
-    const details = data?.error?.message || JSON.stringify(data);
-    throw new Error(`OpenRouter models request failed: ${details}`);
+    throw new Error(describeErrorBody(response.status, bodyText));
   }
 
+  const data = JSON.parse(bodyText);
   const models = Array.isArray(data?.data) ? data.data.map(formatModelEntry) : [];
   models.sort((left, right) => left.name.localeCompare(right.name));
 
-  return {
-    provider: providerName,
-    fetchedAt: new Date().toISOString(),
-    models,
-  };
-}
-
-export function mergeSettings(baseSettings, overrideSettings) {
-  if (
-    baseSettings &&
-    typeof baseSettings === "object" &&
-    overrideSettings &&
-    typeof overrideSettings === "object"
-  ) {
-    const merged = { ...baseSettings };
-    for (const [key, value] of Object.entries(overrideSettings)) {
-      merged[key] = mergeSettings(baseSettings[key], value);
-    }
-    return merged;
+  const result = { baseUrl: provider.baseUrl, fetchedAt: new Date().toISOString(), models };
+  try {
+    await mkdir(getDataDir(), { recursive: true });
+    await writeFile(cachePath(), JSON.stringify(result));
+  } catch {
+    // Listing still works without the cache file.
   }
 
-  return overrideSettings ?? baseSettings;
+  return { fetchedAt: result.fetchedAt, models, cached: false };
 }

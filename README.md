@@ -1,204 +1,128 @@
 # Handwriting OCR
 
-A local transcription app for handwritten documents, especially historical German scripts such as Suetterlin / Sütterlin.
+A desktop app that transcribes handwritten documents, built for historical German scripts such as Kurrent and Sütterlin.
 
 ![Handwriting OCR screenshot](docs/handwriting-ocr-screenshot.png)
 
-You can run it in two ways:
-
-- Browser mode: starts a local server and opens the default browser
-- Desktop mode: runs as a packaged Electron app on macOS or Windows
-
-Multi-page PDFs are split into single pages and transcribed page by page. The
-transcription flow per page is a two-step pipeline:
-
-1. OCR / handwriting transcription model
-2. Correction model
-
-The first implementation starts with OpenRouter for model access and stores settings locally on the machine.
-
-## Features
-
-- Local server that opens the default browser automatically
-- Electron desktop app for macOS and Windows
-- Split-pane UI for upload and transcription
-- Multi-page PDF support with page-by-page transcription
-- Page navigation on the output side, kept in sync with the document preview
-- Pages appear as soon as they are transcribed, instead of after the whole document
-- Optional page range so you can transcribe only part of a long document
-- Original document preview for images and PDFs
-- Save corrected transcription and raw OCR as `.txt`, per page or whole document
-- Settings for OCR model, correction model, and provider API keys
-- OpenRouter-backed OCR and correction pipeline
-- Local JSON settings persistence
-
-## Requirements
-
-- Node.js 18+
+You upload a scan (PDF or image), the app sends each page to a vision model through [OpenRouter](https://openrouter.ai/), and the transcription appears next to the original while it is being written.
 
 ## Install
 
-1. Install Node.js 18 or newer from [nodejs.org](https://nodejs.org/).
-2. Download or clone this repository.
-3. Open a terminal in the project folder.
-4. Install dependencies:
+Download the latest installer from the [Releases page](https://github.com/okreitz/handwriting-ocr/releases/latest).
+
+### Windows
+
+1. Download `Handwriting-OCR-Setup-<version>.exe` and double-click it.
+2. Windows shows a blue "Windows protected your PC" box, because the installer is not code-signed. Click **More info**, then **Run anyway**.
+3. The app installs for your user account (no administrator password needed), adds a desktop and Start-menu shortcut, and starts.
+
+### macOS
+
+1. Download the `.dmg` for your Mac (`arm64` for Apple Silicon, `x64` for Intel), open it and drag the app to Applications.
+2. The app is not notarised by Apple, so the first start is blocked. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+
+### First start
+
+The app opens its Settings on first start. Paste an OpenRouter API key (create one at [openrouter.ai/keys](https://openrouter.ai/keys)), click **Load models**, then **Save settings**.
+
+## Using it
+
+1. Click **Upload document** and choose a PDF, PNG, JPG or WEBP.
+2. Optionally limit a long PDF with the **Pages** field: `1-4`, `2,5`, or `10-` for page 10 to the end. Empty means the whole document.
+3. Click **Transcribe**. Several pages are read at the same time and the text streams in as the model writes it. **Stop** cancels the run.
+4. Move between pages with the page selector. The preview follows along.
+5. **Save page .txt** saves the page you are looking at, **Save all .txt** saves the whole document with `--- Page N ---` separators.
+
+Good to know:
+
+- Readings the model is unsure of are in `[square brackets]`, unreadable words are marked `[illegible]`.
+- A page you have transcribed before loads instantly from a local cache and costs nothing. **Re-run page** asks the model again.
+- If one page fails, the others still finish. The failed page is marked in the page selector with the reason shown above the text.
+- Large images are scaled down to 2400 pixels on the long edge before upload. Models do not read more detail than that, and it makes uploads much faster.
+
+## Settings
+
+| Setting | What it does |
+| --- | --- |
+| API key | Your OpenRouter key. In the desktop app it is stored encrypted with the operating system keychain and is never shown again after saving. |
+| Reading model | The vision model that reads the page. **Fast** (`google/gemini-4-carbon`) is the default, **Best quality** is `anthropic/claude-fable-5.2`, **Budget** is `google/gemini-3.8-flash`. Any other image-capable OpenRouter model can be picked from the list. |
+| Correction pass | Optional second model call that cleans up each page. Off by default: it doubles the calls per page and only sees the text, not the image. |
+| Advanced | Pages read at the same time (default 4; lower it if OpenRouter rate-limits you), base URL, app name and referer sent to OpenRouter. |
+
+The presets follow a public Kurrent benchmark from November 2026. Handwriting varies a lot, so compare the presets on a few of your own pages before a big job.
+
+Settings, the result cache and the model list are stored in the app data folder:
+
+- Windows: `%APPDATA%\handwriting-ocr\data`
+- macOS: `~/Library/Application Support/handwriting-ocr/data`
+- Running from source in a browser: `data/` inside the project folder
+
+## Privacy
+
+The app runs on your computer. PDFs are split into single pages locally, and only the pages you transcribe are sent to OpenRouter and the model provider you chose. Nothing else leaves the machine. The built-in local server only accepts requests from the app itself.
+
+## Development
+
+Requires Node.js 20 or newer.
 
 ```bash
 npm install
 ```
 
-5. Start the browser app:
+Run in the browser (starts a local server on `http://127.0.0.1:3000` and opens it):
 
 ```bash
 npm start
 ```
 
-6. Open the localhost URL shown in the terminal.
-   If port `3000` is already in use, the app automatically falls back to the next free port.
-
-7. Open `Settings`, add your OpenRouter API key, load models, and choose:
-   - one vision-capable OCR model
-   - one correction model
-
-8. Upload a handwritten page or a multi-page PDF and click `Transcribe`.
-
-## Multi-Page PDFs
-
-A PDF with several pages is split locally into single pages before anything is
-sent to a model. Each page then runs through OCR and correction on its own, and
-the result appears in the right-hand panel as soon as that page is finished.
-
-- Use the page selector above the transcription to move between pages. The
-  document preview follows along, so both sides always show the same page.
-- Each page costs two model calls, so a 40-page PDF means 80 calls. Use the
-  `Pages` field next to `Transcribe` to limit a run: leave it empty for the whole
-  document, or enter `1-4`, `2,5`, or `10-` to start at page 10 and continue to
-  the end.
-- If one page fails, for example because the provider rate-limits the request,
-  the remaining pages still finish. The failed page is marked in the page
-  selector and the reason is shown above the transcription.
-- `Save corrected .txt` and `Save raw OCR .txt` write the whole document with
-  `--- Page N ---` separators. `Save this page .txt` writes only the page you are
-  looking at.
-- The correction step sees the end of the previous corrected page, so sentences
-  running across a page break are cleaned up as one sentence.
-
-Pages are read three at a time by default. To change that, edit `pipeline.ocrConcurrency`
-in the settings file (`data/settings.json` in browser mode, or the app data
-directory in desktop mode). Lower it to `1` if your provider rate-limits you.
-
-## Install Desktop App
-
-To run the desktop app directly on your own computer:
+Run as a desktop app:
 
 ```bash
 npm run desktop
 ```
 
-This opens the app in an Electron window instead of a web browser.
-
-## Make a Windows Installer on a Mac
-
-If you want to give the app to someone on Windows, follow these steps exactly:
-
-1. Open `Terminal` on your Mac.
-2. Go to the project folder.
-3. Install dependencies if you have not already done so:
+Run the tests:
 
 ```bash
-npm install
+npm test
 ```
 
-4. Build the Windows installer:
+### Project layout
+
+| Path | Role |
+| --- | --- |
+| `server/index.js` | Local HTTP server: static files, settings, model list, `/api/transcribe` |
+| `server/transcription-service.js` | Page pipeline: concurrency, cache, optional correction |
+| `server/openrouter.js` | Streaming OpenRouter client with retries and timeouts |
+| `server/pdf-pages.js` | Page-range parsing and PDF splitting (`pdf-lib`) |
+| `server/settings-store.js` | Defaults, settings file, API key handling |
+| `public/` | The UI, plain HTML, CSS and ES modules with no build step |
+| `desktop/main.js` | Electron shell around the local server |
+
+`/api/transcribe` takes the document as the raw request body and answers with newline-delimited JSON: `start`, `page-delta` (streamed text), `page` (finished page) and `done`.
+
+## Building installers
+
+Releases are built by GitHub Actions. Push a version tag and the workflow in `.github/workflows/release.yml` builds the Windows installer and the macOS disk images and attaches them to a draft release:
+
+```bash
+git tag v0.2.0
+```
+
+```bash
+git push origin v0.2.0
+```
+
+Review the draft on GitHub and publish it.
+
+To build locally instead:
 
 ```bash
 npm run dist -- --win
 ```
 
-5. Wait until the build finishes. This can take a little while.
-6. Open the `dist` folder inside this project.
-7. Look for a Windows installer file ending in `.exe`.
-
-That `.exe` file is the Windows installer you can send to a Windows computer.
-
-If you want only the normal Windows installer, use:
-
 ```bash
-npm run dist -- --win nsis
+npm run dist -- --mac
 ```
 
-If you want a portable Windows app instead, use:
-
-```bash
-npm run dist -- --win portable
-```
-
-What you will usually find in the `dist` folder:
-
-- a Windows installer file ending in `.exe`
-- sometimes also a `.zip` file
-
-Important:
-
-- You can build the Windows installer on a Mac.
-- The Windows installer will not run on the Mac. It is only for Windows.
-- If the build stops with an error, run `npm install` again and try again.
-- The first build can be slower because Electron may need to download build files.
-
-## Development
-
-Run the browser version:
-
-```bash
-npm start
-```
-
-The app starts on `http://127.0.0.1:3000` by default and opens your browser automatically. If that port is busy, it uses the next available localhost port.
-
-Run the desktop version:
-
-```bash
-npm run desktop
-```
-
-This launches an Electron window instead of opening the system browser.
-
-## Packaging
-
-Create an unpacked desktop build:
-
-```bash
-npm run pack
-```
-
-Create installable distributables:
-
-```bash
-npm run dist
-```
-
-Typical outputs:
-
-- macOS: `.dmg` and `.zip`
-- Windows: `NSIS` installer and `.zip`
-
-Notes:
-
-- Build macOS artifacts on macOS
-- Windows installers can also be built on macOS with `npm run dist -- --win`
-- App settings are stored in the local app data directory in desktop mode and in `data/settings.json` in browser mode
-
-## Notes
-
-- This version sends each page directly to a vision-capable model through OpenRouter when the OCR step uses the `openrouter` provider.
-- PDF splitting happens on your machine with `pdf-lib`; only single pages leave the app.
-- `/api/transcribe` responds with newline-delimited JSON (`start`, one `page` per finished page, then `done`), which is what lets the UI show pages while the run is still going.
-- The correction step is a second LLM call that cleans up the OCR output with a focus on historical German handwriting such as Suetterlin / Sütterlin.
-- Azure Document Intelligence and Google Document AI are included as future provider targets in the settings schema, but they are not implemented in this first pass.
-
-## Suggested Defaults
-
-- OCR model: a high-end vision-capable OpenRouter model such as `google/gemini-2.5-flash-preview`
-- Correction model: `openai/gpt-5-mini`
-
-Use whatever model IDs are currently available in your OpenRouter account.
+The files land in `dist/`. The Windows installer can be built on a Mac. Neither installer is code-signed.

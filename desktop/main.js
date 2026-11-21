@@ -1,15 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, dialog, safeStorage, shell } from "electron";
 
 import { startServer } from "../server/index.js";
+import { setSecretCodec } from "../server/settings-store.js";
+import { toMessage } from "../server/util.js";
 
 let mainWindow = null;
-let server = null;
 let serverMeta = null;
-
-const HOST = "127.0.0.1";
-const PORT = Number(process.env.PORT || 3000);
-const PRELOAD_PATH = fileURLToPath(new URL("./preload.js", import.meta.url));
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -18,20 +14,29 @@ function createWindow() {
     minWidth: 1080,
     minHeight: 760,
     title: "Handwriting OCR",
-    backgroundColor: "#f5efe2",
+    backgroundColor: "#eef8f5",
     autoHideMenuBar: true,
     webPreferences: {
-      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
   mainWindow.loadURL(serverMeta.url);
 
+  // Links leave the app only as ordinary web pages in the default browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
     return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith(serverMeta.url)) {
+      event.preventDefault();
+    }
   });
 
   mainWindow.on("closed", () => {
@@ -39,68 +44,61 @@ function createWindow() {
   });
 }
 
-async function waitForServer() {
-  const maxAttempts = 80;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      const response = await fetch(`${serverMeta.url}/api/settings`);
-      if (response.ok) {
-        return;
-      }
-    } catch {
-      // Server still starting.
-    }
-
-    await delay(250);
+function focusMainWindow() {
+  if (!mainWindow) {
+    return;
   }
-
-  throw new Error("Timed out waiting for the local server to start.");
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.focus();
 }
 
-function stopServer() {
-  if (!serverMeta?.server) {
+// Keeps the API key in the operating system keychain where one is available.
+function installSecretCodec() {
+  if (!safeStorage.isEncryptionAvailable()) {
     return;
   }
 
-  serverMeta.server.close();
-  serverMeta = null;
-  server = null;
+  setSecretCodec({
+    encrypt: (text) => safeStorage.encryptString(text).toString("base64"),
+    decrypt: (encoded) => safeStorage.decryptString(Buffer.from(encoded, "base64")),
+  });
 }
 
-ipcMain.handle("app:get-meta", () => ({
-  platform: process.platform,
-  appVersion: app.getVersion(),
-}));
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", focusMainWindow);
 
-app.whenReady().then(async () => {
-  try {
-    process.env.APP_DATA_DIR = app.getPath("userData");
-    serverMeta = await startServer({ port: PORT, open: false });
-    server = serverMeta.server;
-    await waitForServer();
-    createWindow();
-  } catch (error) {
-    dialog.showErrorBox(
-      "Startup failed",
-      error instanceof Error ? error.message : String(error)
-    );
-    app.quit();
-  }
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+  app.whenReady().then(async () => {
+    try {
+      process.env.APP_DATA_DIR = app.getPath("userData");
+      installSecretCodec();
+      // Port 0 lets the system pick a free port, so nothing else can clash.
+      serverMeta = await startServer({ port: 0, open: false, maxPortRetries: 0 });
       createWindow();
+    } catch (error) {
+      dialog.showErrorBox("Startup failed", toMessage(error));
+      app.quit();
+      return;
+    }
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+
+  app.on("before-quit", () => {
+    serverMeta?.server.close();
+    serverMeta = null;
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
     }
   });
-});
-
-app.on("before-quit", () => {
-  stopServer();
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+}
