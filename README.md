@@ -4,6 +4,18 @@ Turn scans of old handwriting into text you can read, search and copy.
 
 The app is made for old German handwriting such as Kurrent and Sütterlin: letters, diaries, church records. It also works for other handwriting.
 
+## Download
+
+| Your computer | Download |
+| --- | --- |
+| Windows | [Handwriting-OCR-Setup.exe](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-Setup.exe) |
+| Mac with Apple chip (M1 or newer, 2020 onwards) | [Handwriting-OCR-mac-arm64.dmg](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-mac-arm64.dmg) |
+| Mac with Intel chip (older Macs) | [Handwriting-OCR-mac-x64.dmg](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-mac-x64.dmg) |
+
+Not sure which Mac you have? Click the Apple menu, then **About This Mac**. If it says "Chip: Apple M…", take the Apple chip version.
+
+Then follow the three steps below. It takes about five minutes, once.
+
 ![Handwriting OCR screenshot](docs/handwriting-ocr-screenshot.png)
 
 ## How it works
@@ -16,13 +28,7 @@ The AI models run on the internet, through a service called [OpenRouter](https:/
 
 ## Step 1: Install the app
 
-| Your computer | Download |
-| --- | --- |
-| Windows | [Handwriting-OCR-Setup.exe](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-Setup.exe) |
-| Mac with Apple chip (M1 or newer, 2020 onwards) | [Handwriting-OCR-mac-arm64.dmg](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-mac-arm64.dmg) |
-| Mac with Intel chip (older Macs) | [Handwriting-OCR-mac-x64.dmg](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-mac-x64.dmg) |
-
-Not sure which Mac you have? Click the Apple menu, then **About This Mac**. If it says "Chip: Apple M…", take the Apple chip version.
+Download the file for your computer from the table above.
 
 **Windows**
 
@@ -97,6 +103,8 @@ Handwriting varies a lot. Before a big job, try two or three pages with each but
 
 ## For developers
 
+You do not need any of this to use the app. It is only for people who want to change the code.
+
 Requires Node.js 20 or newer.
 
 ```bash
@@ -137,24 +145,12 @@ Settings and the page cache live in `%APPDATA%\handwriting-ocr\data` on Windows,
 
 **Making a release**
 
-Push a version tag. GitHub then builds the Windows and Mac installers and attaches them to a draft release for you to review and publish.
+Push a version tag. GitHub then builds the Windows installer and the Mac apps and attaches them to a draft release to review and publish.
 
 ```bash
-git tag v0.2.0
+git tag v0.2.1
 ```
 
 ```bash
-git push origin v0.2.0
+git push origin v0.2.1
 ```
-
-To build on your own machine instead (files land in `dist/`):
-
-```bash
-npm run dist -- --win
-```
-
-```bash
-npm run dist -- --mac
-```
-
-The installers are not code-signed, which is why Windows and macOS show a warning on first start.
