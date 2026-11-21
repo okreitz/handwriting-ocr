@@ -328,6 +328,79 @@ h3 {
   color: #527179;
 }
 
+.page-range-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-range-field input {
+  width: 88px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+}
+
+.format-hint code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(58, 89, 94, 0.08);
+  font-size: 0.85em;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.page-step {
+  padding: 8px 14px;
+  line-height: 1;
+}
+
+.page-step:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-select-field select {
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+}
+
+.page-progress {
+  font-size: 0.85rem;
+}
+
+.page-save {
+  margin-left: auto;
+}
+
+.page-error {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(166, 72, 72, 0.1);
+  color: var(--error);
+  font-size: 0.88rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .status-pill {
   padding: 6px 11px;
   border-radius: 999px;
@@ -420,6 +493,44 @@ h3 {
   align-items: center;
   gap: 8px;
   margin: 0;
+}
+
+/* The hidden attribute must win over component display rules. */
+[hidden] {
+  display: none !important;
+}
+
+.upload-button.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.settings-card .toggle input {
+  width: auto;
+  min-height: 0;
+}
+
+.settings-hint {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+details.settings-card summary {
+  cursor: pointer;
+  font-weight: 600;
 }
 
 @media (max-width: 860px) {

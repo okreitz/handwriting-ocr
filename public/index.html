@@ -13,7 +13,7 @@
           <p class="eyebrow">Local transcription workspace</p>
           <h1>Handwriting OCR</h1>
           <p class="topbar-subtitle">
-            Upload a page on the left and review the cleaned transcription on the right.
+            Upload a page on the left and read the transcription on the right.
           </p>
         </div>
         <button id="open-settings" class="secondary-button">Settings</button>
@@ -32,13 +32,22 @@
           <div class="upload-toolbar">
             <input id="file-input" type="file" accept=".pdf,image/*" />
             <label for="file-input" class="secondary-button upload-button">Upload document</label>
+            <label class="page-range-field">
+              <span class="muted">Pages</span>
+              <input id="page-range-input" type="text" placeholder="all" size="7" />
+            </label>
             <button id="transcribe-button" class="primary-button" disabled>
               Transcribe
+            </button>
+            <button id="stop-button" class="secondary-button" type="button" hidden>
+              Stop
             </button>
           </div>
 
           <div class="format-hint muted">
-            PDF, PNG, JPG or WEBP
+            PDF, PNG, JPG or WEBP &middot; multi-page PDFs are transcribed page by page.
+            Leave <em>Pages</em> empty for the whole document, or enter a range like
+            <code>1-4</code>, <code>2,5</code> or <code>10-</code>.
           </div>
 
           <div class="preview-card">
@@ -62,12 +71,13 @@
 
           <div class="preview-card">
             <div class="preview-header">
-              <h3>Pipeline</h3>
+              <h3>How it works</h3>
             </div>
             <ol class="pipeline-list">
-              <li>OCR model reads the document</li>
-              <li>Correction model cleans the transcript</li>
-              <li>Result appears on the right</li>
+              <li>A PDF is split into single pages on your computer</li>
+              <li>Several pages are read by the model at the same time</li>
+              <li>Text appears on the right while it is being written</li>
+              <li>Pages you have transcribed before load instantly</li>
             </ol>
           </div>
         </section>
@@ -78,30 +88,51 @@
               <h2>Transcription</h2>
               <span id="status-pill" class="status-pill idle">Idle</span>
             </div>
-            <p class="section-subtitle">Corrected text is shown first, with the raw OCR directly below it.</p>
+            <p id="output-subtitle" class="section-subtitle">The text of the page you are looking at.</p>
           </div>
+
+          <nav id="page-nav" class="page-nav" aria-label="Transcribed pages" hidden>
+            <button id="prev-page" class="secondary-button page-step" type="button" aria-label="Previous page">
+              &lsaquo;
+            </button>
+            <label class="page-select-field">
+              <span class="visually-hidden">Page</span>
+              <select id="page-select"></select>
+            </label>
+            <button id="next-page" class="secondary-button page-step" type="button" aria-label="Next page">
+              &rsaquo;
+            </button>
+            <span id="page-progress" class="muted page-progress"></span>
+          </nav>
 
           <div class="result-stack">
             <article class="result-card">
               <div class="result-card-header">
-                <h3>Corrected text</h3>
+                <h3 id="primary-title">Transcription</h3>
                 <div class="result-actions">
-                  <button id="save-text-button" class="secondary-button" type="button" disabled>
-                    Save corrected .txt
+                  <button id="rerun-page-button" class="secondary-button" type="button" disabled>
+                    Re-run page
                   </button>
-                  <button id="save-raw-button" class="secondary-button" type="button" disabled>
-                    Save raw OCR .txt
+                  <button id="save-page-button" class="secondary-button" type="button" disabled>
+                    Save page .txt
+                  </button>
+                  <button id="save-text-button" class="secondary-button" type="button" disabled>
+                    Save all .txt
+                  </button>
+                  <button id="save-raw-button" class="secondary-button" type="button" disabled hidden>
+                    Save uncorrected .txt
                   </button>
                 </div>
               </div>
-              <pre id="corrected-output" class="output-text">Your transcription will appear here.</pre>
+              <p id="page-error" class="page-error" hidden></p>
+              <pre id="primary-output" class="output-text">Your transcription will appear here.</pre>
             </article>
 
-            <article class="result-card muted-card">
+            <article id="raw-card" class="result-card muted-card" hidden>
               <div class="result-card-header">
-                <h3>Raw OCR</h3>
+                <h3>Before correction</h3>
               </div>
-              <pre id="raw-output" class="output-text">The raw OCR output will appear here.</pre>
+              <pre id="raw-output" class="output-text"></pre>
             </article>
           </div>
         </section>
@@ -112,40 +143,49 @@
       <form id="settings-form" class="settings-form" method="dialog">
         <div class="settings-header">
           <div>
-            <p class="eyebrow">Model configuration</p>
+            <p class="eyebrow">Configuration</p>
             <h2>Settings</h2>
           </div>
           <button id="close-settings" class="icon-button" type="button">Close</button>
         </div>
 
         <section class="settings-grid">
-          <div class="settings-card">
-            <h3>OCR model</h3>
+          <div class="settings-card wide">
+            <h3>OpenRouter account</h3>
             <label>
-              <span>Provider</span>
-              <select name="ocr-provider">
-                <option value="openrouter">OpenRouter</option>
-                <option value="azureDocumentIntelligence">Azure Document Intelligence</option>
-                <option value="googleDocumentAi">Google Document AI</option>
-              </select>
+              <span>API key</span>
+              <input name="openrouter-api-key" type="password" autocomplete="off" placeholder="sk-or-..." />
             </label>
+            <p id="api-key-hint" class="muted settings-hint"></p>
+            <div class="model-refresh-row">
+              <button id="refresh-models" class="secondary-button" type="button">Load models</button>
+              <span id="models-status" class="muted">Add your key, then load the model list.</span>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Reading model</h3>
+            <div class="preset-row">
+              <button class="secondary-button preset-button" type="button" data-model="google/gemini-4-carbon">Fast</button>
+              <button class="secondary-button preset-button" type="button" data-model="anthropic/claude-fable-5.2">Best quality</button>
+              <button class="secondary-button preset-button" type="button" data-model="google/gemini-3.8-flash">Budget</button>
+            </div>
             <label>
-              <span>Model</span>
+              <span>Model (must accept images)</span>
               <input name="ocr-model-search" type="search" placeholder="Search models" />
               <select name="ocr-model"></select>
             </label>
           </div>
 
           <div class="settings-card">
-            <h3>Correction model</h3>
-            <label>
-              <span>Provider</span>
-              <select name="correction-provider">
-                <option value="openrouter">OpenRouter</option>
-                <option value="azureDocumentIntelligence">Azure Document Intelligence</option>
-                <option value="googleDocumentAi">Google Document AI</option>
-              </select>
+            <h3>Correction pass</h3>
+            <label class="toggle">
+              <input name="correction-enabled" type="checkbox" />
+              <span>Clean up each page with a second model</span>
             </label>
+            <p class="muted settings-hint">
+              Off by default. It doubles the model calls per page and does not see the image.
+            </p>
             <label>
               <span>Model</span>
               <input name="correction-model-search" type="search" placeholder="Search models" />
@@ -153,38 +193,25 @@
             </label>
           </div>
 
-          <div class="settings-card wide">
-            <h3>Providers</h3>
-            <div class="provider-block">
-              <div class="provider-title-row">
-                <h4>OpenRouter</h4>
-                <label class="toggle">
-                  <input name="openrouter-enabled" type="checkbox" />
-                  <span>Enabled</span>
-                </label>
-              </div>
-              <label>
-                <span>Base URL</span>
-                <input name="openrouter-base-url" type="text" placeholder="https://openrouter.ai/api/v1" />
-              </label>
-              <label>
-                <span>API key</span>
-                <input name="openrouter-api-key" type="password" placeholder="sk-or-..." />
-              </label>
-              <label>
-                <span>App name</span>
-                <input name="openrouter-app-name" type="text" placeholder="Handwriting OCR" />
-              </label>
-              <label>
-                <span>Referer</span>
-                <input name="openrouter-referer" type="text" placeholder="Optional" />
-              </label>
-              <div class="model-refresh-row">
-                <button id="refresh-models" class="secondary-button" type="button">Load models</button>
-                <span id="models-status" class="muted">Saved models are shown until refreshed.</span>
-              </div>
-            </div>
-          </div>
+          <details class="settings-card wide">
+            <summary>Advanced</summary>
+            <label>
+              <span>Pages read at the same time (1 to 8)</span>
+              <input name="ocr-concurrency" type="number" min="1" max="8" step="1" />
+            </label>
+            <label>
+              <span>Base URL</span>
+              <input name="openrouter-base-url" type="text" placeholder="https://openrouter.ai/api/v1" />
+            </label>
+            <label>
+              <span>App name sent to OpenRouter</span>
+              <input name="openrouter-app-name" type="text" placeholder="Handwriting OCR" />
+            </label>
+            <label>
+              <span>Referer</span>
+              <input name="openrouter-referer" type="text" placeholder="Optional" />
+            </label>
+          </details>
         </section>
 
         <menu class="settings-actions">
