@@ -16,19 +16,25 @@ The AI models run on the internet, through a service called [OpenRouter](https:/
 
 ## Step 1: Install the app
 
-Download the installer from the [Releases page](https://github.com/okreitz/handwriting-ocr/releases/latest).
+| Your computer | Download |
+| --- | --- |
+| Windows | [Handwriting-OCR-Setup.exe](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-Setup.exe) |
+| Mac with Apple chip (M1 or newer, 2020 onwards) | [Handwriting-OCR-mac-arm64.dmg](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-mac-arm64.dmg) |
+| Mac with Intel chip (older Macs) | [Handwriting-OCR-mac-x64.dmg](https://github.com/okreitz/handwriting-ocr/releases/latest/download/Handwriting-OCR-mac-x64.dmg) |
+
+Not sure which Mac you have? Click the Apple menu, then **About This Mac**. If it says "Chip: Apple M…", take the Apple chip version.
 
 **Windows**
 
-1. Download the file ending in `.exe` and double-click it.
+1. Double-click the downloaded file.
 2. Windows shows a blue box saying "Windows protected your PC". Click **More info**, then **Run anyway**. This appears because the app is new and not registered with Microsoft.
 3. The app installs itself and opens. You will find a shortcut on your desktop.
 
 **Mac**
 
-1. Download the file ending in `.dmg`. Choose `arm64` for newer Macs (M1 and later) or `x64` for older Intel Macs.
-2. Open the file and drag the app into your Applications folder.
-3. The first time you open it, your Mac blocks it. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
+1. Open the downloaded file and drag the app into your Applications folder.
+2. Open the app from Applications. Your Mac blocks it the first time, because the app is not registered with Apple.
+3. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. From then on it opens normally.
 
 ## Step 2: Add your OpenRouter key
 

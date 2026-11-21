@@ -21,7 +21,7 @@
   "build": {
     "appId": "com.okreitz.handwritingocr",
     "productName": "Handwriting OCR",
-    "artifactName": "Handwriting-OCR-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Handwriting-OCR-${os}-${arch}.${ext}",
     "files": [
       "desktop/**/*",
       "server/**/*",
@@ -60,8 +60,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
-      "artifactName": "Handwriting-OCR-Setup-${version}.${ext}"
-    }
+      "artifactName": "Handwriting-OCR-Setup.${ext}"
+    },
+    "afterPack": "scripts/after-pack.cjs"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1"
