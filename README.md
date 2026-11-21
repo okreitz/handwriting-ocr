@@ -4,6 +4,15 @@ Turn scans of old handwriting into text you can read, search and copy.
 
 The app is made for old German handwriting such as Kurrent and Sütterlin: letters, diaries, church records. It also works for other handwriting.
 
+## What you need
+
+You need two things:
+
+1. **The app.** It is free. Download it below.
+2. **An [OpenRouter](https://openrouter.ai/) account with a little credit on it.** OpenRouter is the internet service that does the actual reading. The app cannot read anything without it. Signing up is free, and 5 dollars of credit lasts for hundreds of pages.
+
+You also need an internet connection while the app is reading. Step 2 below shows how to connect the app to your OpenRouter account.
+
 ## Download
 
 | Your computer | Download |
@@ -24,7 +33,7 @@ Then follow the three steps below. It takes about five minutes, once.
 2. The app sends each page to an AI model that can read handwriting.
 3. The text appears next to your scan, page by page.
 
-The AI models run on the internet, through a service called [OpenRouter](https://openrouter.ai/). You need an OpenRouter account with a little credit on it. Reading a page costs roughly one cent or less with the default model.
+The AI models run on the internet, through [OpenRouter](https://openrouter.ai/). Reading a page costs roughly one cent or less with the default model.
 
 ## Step 1: Install the app
 
