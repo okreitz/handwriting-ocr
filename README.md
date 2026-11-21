@@ -1,67 +1,95 @@
 # Handwriting OCR
 
-A desktop app that transcribes handwritten documents, built for historical German scripts such as Kurrent and Sütterlin.
+Turn scans of old handwriting into text you can read, search and copy.
+
+The app is made for old German handwriting such as Kurrent and Sütterlin: letters, diaries, church records. It also works for other handwriting.
 
 ![Handwriting OCR screenshot](docs/handwriting-ocr-screenshot.png)
 
-You upload a scan (PDF or image), the app sends each page to a vision model through [OpenRouter](https://openrouter.ai/), and the transcription appears next to the original while it is being written.
+## How it works
 
-## Install
+1. You open a scan (a PDF or a photo).
+2. The app sends each page to an AI model that can read handwriting.
+3. The text appears next to your scan, page by page.
 
-Download the latest installer from the [Releases page](https://github.com/okreitz/handwriting-ocr/releases/latest).
+The AI models run on the internet, through a service called [OpenRouter](https://openrouter.ai/). You need an OpenRouter account with a little credit on it. Reading a page costs roughly one cent or less with the default model.
 
-### Windows
+## Step 1: Install the app
 
-1. Download `Handwriting-OCR-Setup-<version>.exe` and double-click it.
-2. Windows shows a blue "Windows protected your PC" box, because the installer is not code-signed. Click **More info**, then **Run anyway**.
-3. The app installs for your user account (no administrator password needed), adds a desktop and Start-menu shortcut, and starts.
+Download the installer from the [Releases page](https://github.com/okreitz/handwriting-ocr/releases/latest).
 
-### macOS
+**Windows**
 
-1. Download the `.dmg` for your Mac (`arm64` for Apple Silicon, `x64` for Intel), open it and drag the app to Applications.
-2. The app is not notarised by Apple, so the first start is blocked. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+1. Download the file ending in `.exe` and double-click it.
+2. Windows shows a blue box saying "Windows protected your PC". Click **More info**, then **Run anyway**. This appears because the app is new and not registered with Microsoft.
+3. The app installs itself and opens. You will find a shortcut on your desktop.
 
-### First start
+**Mac**
 
-The app opens its Settings on first start. Paste an OpenRouter API key (create one at [openrouter.ai/keys](https://openrouter.ai/keys)), click **Load models**, then **Save settings**.
+1. Download the file ending in `.dmg`. Choose `arm64` for newer Macs (M1 and later) or `x64` for older Intel Macs.
+2. Open the file and drag the app into your Applications folder.
+3. The first time you open it, your Mac blocks it. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
 
-## Using it
+## Step 2: Add your OpenRouter key
 
-1. Click **Upload document** and choose a PDF, PNG, JPG or WEBP.
-2. Optionally limit a long PDF with the **Pages** field: `1-4`, `2,5`, or `10-` for page 10 to the end. Empty means the whole document.
-3. Click **Transcribe**. Several pages are read at the same time and the text streams in as the model writes it. **Stop** cancels the run.
-4. Move between pages with the page selector. The preview follows along.
-5. **Save page .txt** saves the page you are looking at, **Save all .txt** saves the whole document with `--- Page N ---` separators.
+A key is like a password that lets the app use your OpenRouter account.
 
-Good to know:
+1. Create an account at [openrouter.ai](https://openrouter.ai/) and add some credit (5 dollars lasts for hundreds of pages).
+2. Go to [openrouter.ai/keys](https://openrouter.ai/keys) and create a key. Copy it.
+3. In the app, the Settings window opens on first start. Paste the key into **API key**.
+4. Click **Load models**, then **Save settings**.
 
-- Readings the model is unsure of are in `[square brackets]`, unreadable words are marked `[illegible]`.
-- A page you have transcribed before loads instantly from a local cache and costs nothing. **Re-run page** asks the model again.
-- If one page fails, the others still finish. The failed page is marked in the page selector with the reason shown above the text.
-- Large images are scaled down to 2400 pixels on the long edge before upload. Models do not read more detail than that, and it makes uploads much faster.
+You only do this once.
 
-## Settings
+## Step 3: Transcribe a document
 
-| Setting | What it does |
+1. Click **Upload document** and pick a PDF or an image (JPG, PNG or WEBP).
+2. Click **Transcribe**.
+3. Read the text on the right. Use the page selector to move between pages. The scan on the left follows along.
+4. Click **Save all .txt** to save the whole text, or **Save page .txt** for one page.
+
+Tips:
+
+- **Long PDF?** Type the pages you want into the **Pages** box before you start: `1-4` for pages 1 to 4, `2,5` for pages 2 and 5, `10-` for page 10 to the end.
+- **Changed your mind?** Click **Stop**. Pages that are already done stay.
+- **Square brackets** mean the model was not sure: `[Friedrich]` is a guess, `[illegible]` means it could not read the word.
+- **Not happy with a page?** Click **Re-run page** to have it read again.
+- **Opening the same scan again is free.** The app remembers pages it has already read.
+- **A page failed?** The others still finish. The failed page is marked, with the reason shown above the text.
+
+## Choosing a model
+
+In **Settings → Reading model** there are three buttons:
+
+| Button | Good for |
 | --- | --- |
-| API key | Your OpenRouter key. In the desktop app it is stored encrypted with the operating system keychain and is never shown again after saving. |
-| Reading model | The vision model that reads the page. **Fast** (`google/gemini-4-carbon`) is the default, **Best quality** is `anthropic/claude-fable-5.2`, **Budget** is `google/gemini-3.8-flash`. Any other image-capable OpenRouter model can be picked from the list. |
-| Correction pass | Optional second model call that cleans up each page. Off by default: it doubles the calls per page and only sees the text, not the image. |
-| Advanced | Pages read at the same time (default 4; lower it if OpenRouter rate-limits you), base URL, app name and referer sent to OpenRouter. |
+| **Fast** | The default. Quick, cheap and accurate. |
+| **Best quality** | Difficult handwriting. Costs a few cents per page. |
+| **Budget** | Large amounts of easy pages. |
 
-The presets follow a public Kurrent benchmark from November 2026. Handwriting varies a lot, so compare the presets on a few of your own pages before a big job.
+Handwriting varies a lot. Before a big job, try two or three pages with each button and keep the one that reads yours best.
 
-Settings, the result cache and the model list are stored in the app data folder:
+**Correction pass** (off by default) lets a second model tidy up the text afterwards. It makes every page take longer and cost more, and usually is not needed.
 
-- Windows: `%APPDATA%\handwriting-ocr\data`
-- macOS: `~/Library/Application Support/handwriting-ocr/data`
-- Running from source in a browser: `data/` inside the project folder
+## Your privacy
 
-## Privacy
+- The app runs on your own computer.
+- Only the pages you transcribe are sent out, to OpenRouter and the AI model you chose.
+- Your key is stored on your computer, in encrypted form.
 
-The app runs on your computer. PDFs are split into single pages locally, and only the pages you transcribe are sent to OpenRouter and the model provider you chose. Nothing else leaves the machine. The built-in local server only accepts requests from the app itself.
+## Problems?
 
-## Development
+| What you see | What to do |
+| --- | --- |
+| "OpenRouter API key is missing" | Open **Settings** and paste your key (Step 2). |
+| A page fails with a rate limit message | Wait a minute and click **Re-run page**. If it keeps happening, open **Settings → Advanced** and lower "Pages read at the same time". |
+| "This image format cannot be read here" | Save the scan as JPG, PNG or PDF and try again. |
+| "This PDF is password-protected" | Save a copy without a password first. |
+| The text stops in the middle of a page | The model ran out of room. Click **Re-run page**, or try the **Best quality** model. |
+
+---
+
+## For developers
 
 Requires Node.js 20 or newer.
 
@@ -69,7 +97,7 @@ Requires Node.js 20 or newer.
 npm install
 ```
 
-Run in the browser (starts a local server on `http://127.0.0.1:3000` and opens it):
+Run in the browser:
 
 ```bash
 npm start
@@ -87,23 +115,23 @@ Run the tests:
 npm test
 ```
 
-### Project layout
+**Where things are**
 
 | Path | Role |
 | --- | --- |
-| `server/index.js` | Local HTTP server: static files, settings, model list, `/api/transcribe` |
-| `server/transcription-service.js` | Page pipeline: concurrency, cache, optional correction |
-| `server/openrouter.js` | Streaming OpenRouter client with retries and timeouts |
-| `server/pdf-pages.js` | Page-range parsing and PDF splitting (`pdf-lib`) |
-| `server/settings-store.js` | Defaults, settings file, API key handling |
-| `public/` | The UI, plain HTML, CSS and ES modules with no build step |
-| `desktop/main.js` | Electron shell around the local server |
+| `server/index.js` | Local web server: pages, settings, model list, `/api/transcribe` |
+| `server/transcription-service.js` | Reads pages in parallel, caches results, optional correction |
+| `server/openrouter.js` | Talks to OpenRouter: streaming, retries, timeouts |
+| `server/pdf-pages.js` | Page ranges and PDF splitting |
+| `server/settings-store.js` | Default settings, settings file, key handling |
+| `public/` | The user interface (plain HTML, CSS and JavaScript, no build step) |
+| `desktop/main.js` | Electron window around the local server |
 
-`/api/transcribe` takes the document as the raw request body and answers with newline-delimited JSON: `start`, `page-delta` (streamed text), `page` (finished page) and `done`.
+Settings and the page cache live in `%APPDATA%\handwriting-ocr\data` on Windows, `~/Library/Application Support/handwriting-ocr/data` on macOS, and `data/` in the project folder when run from source.
 
-## Building installers
+**Making a release**
 
-Releases are built by GitHub Actions. Push a version tag and the workflow in `.github/workflows/release.yml` builds the Windows installer and the macOS disk images and attaches them to a draft release:
+Push a version tag. GitHub then builds the Windows and Mac installers and attaches them to a draft release for you to review and publish.
 
 ```bash
 git tag v0.2.0
@@ -113,9 +141,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Review the draft on GitHub and publish it.
-
-To build locally instead:
+To build on your own machine instead (files land in `dist/`):
 
 ```bash
 npm run dist -- --win
@@ -125,4 +151,4 @@ npm run dist -- --win
 npm run dist -- --mac
 ```
 
-The files land in `dist/`. The Windows installer can be built on a Mac. Neither installer is code-signed.
+The installers are not code-signed, which is why Windows and macOS show a warning on first start.
